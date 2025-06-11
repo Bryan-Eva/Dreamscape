@@ -24,8 +24,12 @@ struct RegisterView: View {
                     completion: { success, error in
                         if success {
                             message = "register success"
+                            FirebaseService.userLogout(completion: {
+                                success,
+                                error in
+                            })
                         } else {
-                            if let _ = error {
+                            if error != nil {
                                 message = error?.localizedDescription ?? "未知錯誤"
                             }
                         }

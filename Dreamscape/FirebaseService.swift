@@ -39,6 +39,15 @@ class FirebaseService {
         }
     }
     
+    static func userLogout(completion: @escaping (Bool, Error?) -> Void) {
+        do {
+            try Auth.auth().signOut()
+            completion(true, nil)
+        } catch let signOutError {
+            completion(false, signOutError)
+        }
+    }
+    
     static func isUserLoggedIn() -> Bool {
         return Auth.auth().currentUser != nil
     }
