@@ -8,6 +8,7 @@ import FirebaseAuth
 import FirebaseFirestore
 
 class FirebaseService {
+    // auth
     static func userRegister(
         mail: String,
         password: String,
@@ -53,7 +54,8 @@ class FirebaseService {
         return Auth.auth().currentUser != nil
     }
 
-    static func fetchUser(
+    // user
+    static func fetchSingleUser(
         uid: String,
         completion: @escaping (Bool, Error?, User?) -> Void
     ) {
@@ -78,7 +80,44 @@ class FirebaseService {
         }
     }
 
-    static func fetchArticle(
+    static func updateUser(
+        user: User,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(user.uid)
+
+        userRef.updateData(user.toDictionary()) { error in
+            if let error = error {
+                print("更新失敗: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("更新成功")
+                completion(true, nil)
+            }
+        }
+    }
+
+    static func createUser(
+        user: User,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(user.uid)
+
+        userRef.setData(user.toDictionary()) { error in
+            if let error = error {
+                print("建立失敗: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("建立成功")
+                completion(true, nil)
+            }
+        }
+    }
+
+    // article
+    static func fetchSingleArticle(
         articleId: String,
         completion: @escaping (Bool, Error?, Article?) -> Void
     ) {
@@ -101,6 +140,52 @@ class FirebaseService {
         }
     }
 
+    static func fetchAuthorAllArticles(
+        authorUid: String,
+        completion: @escaping (Bool, Error?, [Article]?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let articlesRef = db.collection("articles")
+
+        articlesRef
+            .whereField("authorUid", isEqualTo: authorUid)
+            .order(by: "createdAt", descending: true)  // 可選：照時間排序
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(false, error, nil)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    completion(false, nil, nil)
+                    return
+                }
+
+                let articles = documents.compactMap { doc in
+                    Utils.docToArticle(doc: doc)
+                }
+
+                completion(true, nil, articles)
+            }
+    }
+
+    static func createArticle(
+        article: Article,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let articleRef = db.collection("articles").document(article.id)
+
+        articleRef.setData(article.toDictionary()) { error in
+            if let error = error {
+                completion(false, error)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
+
+    // other
     static func uploadImage(
         image: UIImage,
         completion: @escaping (String?, Error?) -> Void
@@ -168,23 +253,5 @@ class FirebaseService {
                 completion(nil, error)
             }
         }.resume()
-    }
-
-    static func updateUser(
-        user: User,
-        completion: @escaping (Bool, Error?) -> Void
-    ) {
-        let db = Firestore.firestore()
-        let userRef = db.collection("users").document(user.uid)
-
-        userRef.updateData(user.toDictionary()) { error in
-            if let error = error {
-                print("更新失敗: \(error.localizedDescription)")
-                completion(false, error)
-            } else {
-                print("更新成功")
-                completion(true, nil)
-            }
-        }
     }
 }

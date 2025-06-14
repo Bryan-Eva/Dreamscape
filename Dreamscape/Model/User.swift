@@ -14,9 +14,7 @@ struct User {
     var createdAt: Timestamp
     var likedArticles: [String]
     var savedArticles: [String]
-}
 
-extension User {
     func toDictionary() -> [String: Any] {
         return [
             "uid": uid,
@@ -24,7 +22,7 @@ extension User {
             "avatar": avatar,
             "createdAt": createdAt,
             "likedArticles": likedArticles,
-            "savedArticles": savedArticles
+            "savedArticles": savedArticles,
         ]
     }
 }

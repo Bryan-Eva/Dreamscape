@@ -14,4 +14,20 @@ struct Article: Identifiable {
     var content: String
     var photo: String
     var createdAt: Timestamp
+    var likedCount: Int
+    var savedCount: Int
+    var topic: String
+
+    func toDictionary() -> [String: Any] {
+        return [
+            "title": title,
+            "content": content,
+            "authorUid": authorUid,
+            "photo": photo,
+            "createdAt": createdAt,
+            "likedCount": likedCount,
+            "savedCiubt": savedCount,
+            "topic": topic,
+        ]
+    }
 }

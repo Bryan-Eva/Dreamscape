@@ -35,7 +35,10 @@ class Utils {
             let content = data["content"] as? String,
             let authorUid = data["authorUid"] as? String,
             let createdAt = data["createdAt"] as? Timestamp,
-            let photo = data["photo"] as? String
+            let photo = data["photo"] as? String,
+            let likedCount = data["likedCount"] as? Int,
+            let savedCount = data["savedCount"] as? Int,
+            let topic = data["topic"] as? String
         else {
             return nil
         }
@@ -45,7 +48,10 @@ class Utils {
             authorUid: authorUid,
             content: content,
             photo: photo,
-            createdAt: createdAt
+            createdAt: createdAt,
+            likedCount: likedCount,
+            savedCount: savedCount,
+            topic: topic
         )
     }
 }

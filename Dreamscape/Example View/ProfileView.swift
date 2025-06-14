@@ -95,13 +95,13 @@ struct ProfileView: View {
 
     func loadUser() {
         let uid = Auth.auth().currentUser?.uid ?? ""
-        FirebaseService.fetchUser(uid: uid) { success, error, user in
+        FirebaseService.fetchSingleUser(uid: uid) { success, error, user in
             if success, let user = user {
                 self.user = user
                 self.url = user.avatar
                 self.likedArticles.removeAll()
                 user.likedArticles.forEach { likedArticle in
-                    FirebaseService.fetchArticle(articleId: likedArticle) {
+                    FirebaseService.fetchSingleArticle(articleId: likedArticle) {
                         success,
                         _,
                         article in
