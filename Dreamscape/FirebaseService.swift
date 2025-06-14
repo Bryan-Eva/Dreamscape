@@ -160,7 +160,6 @@ class FirebaseService {
                     completion(false, nil, nil)
                     return
                 }
-
                 let articles = documents.compactMap { doc in
                     Utils.docToArticle(doc: doc)
                 }
@@ -174,7 +173,7 @@ class FirebaseService {
         completion: @escaping (Bool, Error?) -> Void
     ) {
         let db = Firestore.firestore()
-        let articleRef = db.collection("articles").document(article.id)
+        let articleRef = db.collection("articles").document()
 
         articleRef.setData(article.toDictionary()) { error in
             if let error = error {

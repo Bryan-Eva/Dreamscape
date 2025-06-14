@@ -26,7 +26,7 @@ struct Article: Identifiable {
             "photo": photo,
             "createdAt": createdAt,
             "likedCount": likedCount,
-            "savedCiubt": savedCount,
+            "savedCount": savedCount,
             "topic": topic,
         ]
     }
