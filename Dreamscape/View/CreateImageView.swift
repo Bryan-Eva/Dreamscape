@@ -28,6 +28,7 @@ struct CreateImageView: View {
             // Background
             // call Dynamic Background
             AnimatedStarfieldBackground(starCount: 72)
+                .ignoresSafeArea()
 
             VStack(spacing: 20) {
                 // Text Input Field
