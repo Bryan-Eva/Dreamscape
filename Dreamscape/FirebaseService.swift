@@ -54,7 +54,7 @@ class FirebaseService {
         return Auth.auth().currentUser != nil
     }
 
-    // user
+    // user (CRU)
     static func fetchSingleUser(
         uid: String,
         completion: @escaping (Bool, Error?, User?) -> Void
@@ -116,7 +116,7 @@ class FirebaseService {
         }
     }
 
-    // article
+    // article (CRU)
     static func fetchSingleArticle(
         articleId: String,
         completion: @escaping (Bool, Error?, Article?) -> Void
@@ -149,7 +149,7 @@ class FirebaseService {
 
         articlesRef
             .whereField("authorUid", isEqualTo: authorUid)
-            .order(by: "createdAt", descending: true)  // 可選：照時間排序
+            .order(by: "time", descending: true)  // 可選：照時間排序
             .getDocuments { snapshot, error in
                 if let error = error {
                     completion(false, error, nil)
@@ -173,15 +173,85 @@ class FirebaseService {
         completion: @escaping (Bool, Error?) -> Void
     ) {
         let db = Firestore.firestore()
-        let articleRef = db.collection("articles").document()
+        let data = article.toDictionary()
 
-        articleRef.setData(article.toDictionary()) { error in
+        // 用自動產生的 document ID
+        db.collection("articles").addDocument(data: data) { error in
             if let error = error {
                 completion(false, error)
             } else {
                 completion(true, nil)
             }
         }
+    }
+
+    static func updateArticle(
+        article: Article,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let data = article.toDictionary()
+
+        db.collection("articles").document(article.id).setData(
+            data,
+            merge: true
+        ) {
+            error in
+            if let error = error {
+                completion(false, error)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
+
+    // comment (CR)
+    static func createComment(
+        comment: Comment,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let data = comment.toDictionary()
+
+        db.collection("comments").addDocument(data: data) { error in
+            if let error = error {
+                completion(false, error)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
+
+    static func fetchComments(
+        for articleId: String,
+        completion: @escaping (Bool, Error?, [Comment]?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        db.collection("comments")
+            .whereField("articleId", isEqualTo: articleId)
+            .order(by: "time", descending: false)  // 按時間排序（最舊到最新）
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(false, error, nil)
+                    return
+                }
+                guard let docs = snapshot?.documents else {
+                    completion(true, nil, [])  // 沒留言回空陣列
+                    return
+                }
+
+                let comments = docs.compactMap { doc -> Comment? in
+                    return Comment(
+                        id: doc.documentID,
+                        articleId: doc.data()["articleId"] as? String ?? "",
+                        text: doc.data()["text"] as? String ?? "",
+                        time: doc.data()["time"] as? Timestamp
+                            ?? Timestamp(date: Date()),
+                        uid: doc.data()["uid"] as? String ?? ""
+                    )
+                }
+                completion(true, nil, comments)
+            }
     }
 
     // other

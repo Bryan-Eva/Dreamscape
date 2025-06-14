@@ -9,25 +9,30 @@ import FirebaseFirestore
 
 struct Article: Identifiable {
     var id: String
-    var title: String
     var authorUid: String
-    var content: String
-    var photo: String
-    var createdAt: Timestamp
+    var emotions: [String]
+    var image: String
     var likedCount: Int
     var savedCount: Int
-    var topic: String
+    var text: String
+    var time: Timestamp
+    var title: String
+    var topics: [String]
+    var visible: Bool
 
     func toDictionary() -> [String: Any] {
         return [
-            "title": title,
-            "content": content,
+            "id": id,
             "authorUid": authorUid,
-            "photo": photo,
-            "createdAt": createdAt,
+            "emotions": emotions,
+            "image": image,
             "likedCount": likedCount,
             "savedCount": savedCount,
-            "topic": topic,
+            "text": text,
+            "time": time,
+            "title": title,
+            "topics": topics,
+            "visible": visible,
         ]
     }
 }

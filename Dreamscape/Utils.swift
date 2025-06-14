@@ -30,28 +30,62 @@ class Utils {
     }
 
     static func docToArticle(doc: DocumentSnapshot) -> Article? {
-        guard let data = doc.data(),
-            let title = data["title"] as? String,
-            let content = data["content"] as? String,
+        guard let data = doc.data() else { return nil }
+
+        // 從 Dictionary 取出欄位，注意型別轉換和預設值
+        guard
             let authorUid = data["authorUid"] as? String,
-            let createdAt = data["createdAt"] as? Timestamp,
-            let photo = data["photo"] as? String,
+            let emotions = data["emotions"] as? [String],
+            let image = data["image"] as? String,
             let likedCount = data["likedCount"] as? Int,
             let savedCount = data["savedCount"] as? Int,
-            let topic = data["topic"] as? String
+            let text = data["text"] as? String,
+            let time = data["time"] as? Timestamp,
+            let title = data["title"] as? String,
+            let topics = data["topics"] as? [String],
+            let visible = data["visible"] as? Bool
         else {
             return nil
         }
+
+        // id 從 doc.documentID 取得
+        let id = doc.documentID
+
         return Article(
-            id: doc.documentID,
-            title: title,
+            id: id,
             authorUid: authorUid,
-            content: content,
-            photo: photo,
-            createdAt: createdAt,
+            emotions: emotions,
+            image: image,
             likedCount: likedCount,
             savedCount: savedCount,
-            topic: topic
+            text: text,
+            time: time,
+            title: title,
+            topics: topics,
+            visible: visible
+        )
+    }
+
+    static func docToComment(doc: DocumentSnapshot) -> Comment? {
+        guard let data = doc.data() else { return nil }
+
+        guard
+            let text = data["text"] as? String,
+            let articleId = data["articleId"] as? String,
+            let time = data["time"] as? Timestamp,
+            let uid = data["uid"] as? String
+        else {
+            return nil
+        }
+
+        let id = doc.documentID
+
+        return Comment(
+            id: id,
+            articleId: articleId,
+            text: text,
+            time: time,
+            uid: uid
         )
     }
 }

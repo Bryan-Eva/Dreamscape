@@ -11,6 +11,7 @@ import SwiftUI
 
 struct ArticleView: View {
     @State private var articles: [Article] = []
+    @State private var comments: [Comment] = []
     @State private var errorMessage: String?
     @State private var isLoading = true
     @State private var showCreateSheet = false
@@ -33,10 +34,16 @@ struct ArticleView: View {
                                 Text($article.title.wrappedValue)
                                     .font(.headline)
                                 Text(
-                                    "建立時間：\($article.createdAt.wrappedValue.dateValue().formatted(.dateTime.year().month().day()))"
+                                    "建立時間：\($article.time.wrappedValue.dateValue().formatted(.dateTime.year().month().day()))"
                                 )
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
+                            }
+                        }
+                        ForEach(comments) { comment in
+                            VStack {
+                                Text(comment.id)
+                                Text(comment.text)
                             }
                         }
                     }
@@ -61,6 +68,35 @@ struct ArticleView: View {
                         loadMyArticles()
                     }
                 }
+                Button(action: {
+                    let comment = Comment(
+                        id: "",
+                        articleId: articles[0].id,
+                        text: "test comment",
+                        time: Timestamp(date: Date()),
+                        uid: Auth.auth().currentUser!.uid
+                    )
+                    FirebaseService.createComment(comment: comment) {
+                        success,
+                        error in
+                        if success {
+                            loadMyArticles()
+                        }else{
+                            print(error?.localizedDescription)
+                        }
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "plus")
+                        Text("add comment")
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+                .padding()
             }
             .navigationTitle("我的文章")
             .onAppear {
@@ -84,6 +120,16 @@ struct ArticleView: View {
                 isLoading = false
                 if success, let articles = articles {
                     self.articles = articles
+                    if !articles.isEmpty {
+                        FirebaseService.fetchComments(for: articles[0].id) {
+                            success,
+                            error,
+                            comments in
+                            if success, let comments = comments {
+                                self.comments = comments
+                            }
+                        }
+                    }
                 } else {
                     self.errorMessage = error?.localizedDescription ?? "讀取失敗"
                 }
@@ -124,23 +170,26 @@ struct CreateArticleSheet: View {
     func createArticle() {
         guard let uid = Auth.auth().currentUser?.uid else { return }
 
-        let article = Article(
-            id: UUID().uuidString,
-            title: title,
+        // 假設你先初始化一個 Article，並且把 authorUid 填入 uid
+        let newArticle = Article(
+            id: "",  // Firestore 會自動產生 id，可以先空著
             authorUid: uid,
-            content: content,
-            photo: "",
-            createdAt: Timestamp(),
+            emotions: [],
+            image: "",
             likedCount: 0,
             savedCount: 0,
-            topic: "這裡測試一下喔"
+            text: content,
+            time: Timestamp(date: Date()),
+            title: title,
+            topics: [],
+            visible: true
         )
 
-        FirebaseService.createArticle(article: article) { success, error in
+        FirebaseService.createArticle(article: newArticle) { success, error in
             if success {
                 onCreated()
                 dismiss()
-            }else{
+            } else {
                 title = error?.localizedDescription ?? ""
             }
         }
