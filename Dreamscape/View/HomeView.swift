@@ -27,6 +27,7 @@ struct HomeView: View {
                 // Background
                 // call Dynamic Background
                 AnimatedStarfieldBackground(starCount: 72)
+                    .ignoresSafeArea()
 
                 if isloading {
                     ProgressView("Loading...")

@@ -20,6 +20,7 @@ struct AuthView: View {
             //}
             // call Dynamic Background
             AnimatedStarfieldBackground(starCount: 72)
+                .ignoresSafeArea()
             
             VStack {
                 // Title
