@@ -112,7 +112,7 @@ struct ArticleView: View {
         }
 
         isLoading = true
-        FirebaseService.fetchAuthorAllArticles(authorUid: uid) {
+        FirebaseService.fetchTodayArticles() {
             success,
             error,
             articles in
@@ -131,6 +131,7 @@ struct ArticleView: View {
                         }
                     }
                 } else {
+                    print(error?.localizedDescription ?? "error")
                     self.errorMessage = error?.localizedDescription ?? "讀取失敗"
                 }
             }

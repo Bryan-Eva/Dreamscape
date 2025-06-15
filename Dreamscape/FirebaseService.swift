@@ -139,6 +139,50 @@ class FirebaseService {
             completion(true, nil, article)
         }
     }
+    
+    static func fetchTodayArticles(
+        completion: @escaping (Bool, Error?, [Article]?) -> Void
+    ) {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            completion(false, nil, nil)
+            return
+        }
+
+        let db = Firestore.firestore()
+        let articleRef = db.collection("articles")
+
+        let calendar = Calendar.current
+        let now = Date()
+        guard let startOfDay = calendar.date(from: calendar.dateComponents([.year, .month, .day], from: now)),
+              let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+            completion(false, nil, nil)
+            return
+        }
+
+        let startTimestamp = Timestamp(date: startOfDay)
+        let endTimestamp = Timestamp(date: endOfDay)
+
+        articleRef
+            .whereField("authorUid", isEqualTo: userId)
+            .whereField("time", isGreaterThanOrEqualTo: startTimestamp)
+            .whereField("time", isLessThan: endTimestamp)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(false, error, nil)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    completion(false, nil, nil)
+                    return
+                }
+
+                let articles = documents.compactMap { Utils.docToArticle(doc: $0) }
+                completion(true, nil, articles)
+            }
+    }
+
+
 
     static func fetchAuthorAllArticles(
         authorUid: String,
@@ -204,7 +248,7 @@ class FirebaseService {
             }
         }
     }
-
+    
     // comment (CR)
     static func createComment(
         comment: Comment,
