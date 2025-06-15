@@ -139,7 +139,7 @@ class FirebaseService {
             completion(true, nil, article)
         }
     }
-    
+
     static func fetchTodayArticles(
         completion: @escaping (Bool, Error?, [Article]?) -> Void
     ) {
@@ -153,8 +153,16 @@ class FirebaseService {
 
         let calendar = Calendar.current
         let now = Date()
-        guard let startOfDay = calendar.date(from: calendar.dateComponents([.year, .month, .day], from: now)),
-              let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+        guard
+            let startOfDay = calendar.date(
+                from: calendar.dateComponents([.year, .month, .day], from: now)
+            ),
+            let endOfDay = calendar.date(
+                byAdding: .day,
+                value: 1,
+                to: startOfDay
+            )
+        else {
             completion(false, nil, nil)
             return
         }
@@ -177,12 +185,12 @@ class FirebaseService {
                     return
                 }
 
-                let articles = documents.compactMap { Utils.docToArticle(doc: $0) }
+                let articles = documents.compactMap {
+                    Utils.docToArticle(doc: $0)
+                }
                 completion(true, nil, articles)
             }
     }
-
-
 
     static func fetchAuthorAllArticles(
         authorUid: String,
@@ -248,8 +256,7 @@ class FirebaseService {
             }
         }
     }
-    
-    
+
     static func searchArticles(
         keyword: String?,
         startDate: Date?,
@@ -263,14 +270,21 @@ class FirebaseService {
 
         // 處理時間範圍
         if let start = startDate {
-            query = query.whereField("time", isGreaterThanOrEqualTo: Timestamp(date: start))
+            query = query.whereField(
+                "time",
+                isGreaterThanOrEqualTo: Timestamp(date: start)
+            )
         }
         if let end = endDate {
-            query = query.whereField("time", isLessThanOrEqualTo: Timestamp(date: end))
+            query = query.whereField(
+                "time",
+                isLessThanOrEqualTo: Timestamp(date: end)
+            )
         }
 
         // 處理關鍵字
-        let keywordTrimmed = keyword?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let keywordTrimmed =
+            keyword?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let hasKeyword = !keywordTrimmed.isEmpty
 
         if hasKeyword {
@@ -298,7 +312,7 @@ class FirebaseService {
             completion(true, nil, articles)
         }
     }
-    
+
     // comment (CR)
     static func createComment(
         comment: Comment,
@@ -416,5 +430,105 @@ class FirebaseService {
                 completion(nil, error)
             }
         }.resume()
+    }
+
+    static func getAPIKey(for keyName: String) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            let db = Firestore.firestore()
+            db.collection("settings").document("api_keys").getDocument {
+                document,
+                error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else if let document = document, document.exists {
+                    let data = document.data()
+                    if let keyValue = data?[keyName] as? String {
+                        continuation.resume(returning: keyValue)
+                    } else {
+                        continuation.resume(
+                            throwing: NSError(domain: "APIKeyError", code: -1)
+                        )
+                    }
+                } else {
+                    continuation.resume(
+                        throwing: NSError(domain: "APIKeyError", code: -2)
+                    )
+                }
+            }
+        }
+    }
+
+    static func askOpenRouter(text: String) async throws -> ([String], [String])
+    {
+        let apiKey = try await getAPIKey(for: "openrouter_ai")
+
+        let prompt = """
+            以下是使用者描述的一段夢境，請從中分析出「情緒」和「主題」。請以 JSON 格式回傳：
+            {
+                "emotions": ["情緒1", "情緒2"],
+                "topics": ["主題1", "主題2"]
+            }
+
+            夢境內容：
+            \(text)
+            """
+
+        guard
+            let url = URL(
+                string: "https://openrouter.ai/api/v1/chat/completions"
+            )
+        else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(
+            "Bearer \(apiKey)",
+            forHTTPHeaderField: "Authorization"
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "model": "openai/gpt-3.5-turbo",
+            "messages": [
+                ["role": "user", "content": prompt]
+            ],
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("API 回應：\(responseString)")
+        }
+
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data)
+                as? [String: Any],
+            let choices = json["choices"] as? [[String: Any]],
+            let message = choices.first?["message"] as? [String: Any],
+            let content = message["content"] as? String
+        else {
+            throw NSError(domain: "ParseError", code: -1)
+        }
+
+        let trimmedContent = content.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard
+            let contentData = trimmedContent.data(using: .utf8),
+            let parsed = try? JSONSerialization.jsonObject(with: contentData)
+                as? [String: Any],
+            let emotions = parsed["emotions"] as? [String],
+            let topics = parsed["topics"] as? [String]
+        else {
+            print("解析失敗，content:\n\(content)")
+            throw NSError(domain: "InvalidResponseFormat", code: -2)
+        }
+
+        return (emotions, topics)
     }
 }
