@@ -55,7 +55,7 @@ struct ProfileView: View {
                     }
                 } else {
                     // 沒有圖片時點擊也能開啟選擇器
-                    Image(systemName: "person.circle.fill")
+                    Image(systemName: "person.circle")
                         .resizable()
                         .frame(width: 100, height: 100)
                         .foregroundColor(.gray)
@@ -101,7 +101,8 @@ struct ProfileView: View {
                 self.url = user.avatar
                 self.likedArticles.removeAll()
                 user.likedArticles.forEach { likedArticle in
-                    FirebaseService.fetchSingleArticle(articleId: likedArticle) {
+                    FirebaseService.fetchSingleArticle(articleId: likedArticle)
+                    {
                         success,
                         _,
                         article in
@@ -117,34 +118,28 @@ struct ProfileView: View {
     }
 
     func uploadAndUpdateAvatar(image: UIImage) {
-        FirebaseService.uploadImage(image: image) {
-            imgUrl,
-            error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    errorMsg = "上傳失敗：\(error.localizedDescription)"
-                }
-                return
-            }
-            guard let imgUrl = imgUrl else {
-                DispatchQueue.main.async {
-                    errorMsg = "上傳失敗：沒有取得圖片網址"
-                }
-                return
-            }
+        Task {
+            do {
+                let imageUrl = try await FirebaseService.uploadImage(
+                    image: image
+                )
+                var newUser = user
+                newUser?.avatar = imageUrl
 
-            var newUser = user
-            newUser?.avatar = imgUrl
-
-            FirebaseService.updateUser(user: newUser!) { success, err in
-                DispatchQueue.main.async {
-                    if success {
-                        errorMsg = nil
-                        loadUser()
-                    } else {
-                        errorMsg = "Firebase 更新失敗：\(err?.localizedDescription)"
+                FirebaseService.updateUser(user: newUser!) { success, err in
+                    DispatchQueue.main.async {
+                        if success {
+                            errorMsg = nil
+                            loadUser()
+                        } else {
+                            errorMsg =
+                                "Firebase 更新失敗：\(err?.localizedDescription)"
+                        }
                     }
                 }
+                print("圖片上傳成功：\(imageUrl)")
+            } catch {
+                print("上傳失敗：\(error.localizedDescription)")
             }
         }
     }
