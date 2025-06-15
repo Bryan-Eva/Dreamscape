@@ -5,8 +5,10 @@
 //  Created by Vivian Chen on 2025/6/11.
 //
 import FirebaseAuth
+import FirebaseFirestore
 
 class FirebaseService {
+    // auth
     static func userRegister(
         mail: String,
         password: String,
@@ -38,7 +40,7 @@ class FirebaseService {
             }
         }
     }
-    
+
     static func userLogout(completion: @escaping (Bool, Error?) -> Void) {
         do {
             try Auth.auth().signOut()
@@ -47,8 +49,278 @@ class FirebaseService {
             completion(false, signOutError)
         }
     }
-    
+
     static func isUserLoggedIn() -> Bool {
         return Auth.auth().currentUser != nil
+    }
+
+    // user (CRU)
+    static func fetchSingleUser(
+        uid: String,
+        completion: @escaping (Bool, Error?, User?) -> Void
+    ) {
+
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(uid)
+
+        userRef.getDocument { document, error in
+            if let error = error {
+                completion(false, error, nil)
+                return
+            }
+
+            guard let document = document, document.exists,
+                let user = Utils.docToUser(doc: document)
+            else {
+                completion(false, nil, nil)
+                return
+            }
+
+            completion(true, nil, user)
+        }
+    }
+
+    static func updateUser(
+        user: User,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(user.uid)
+
+        userRef.updateData(user.toDictionary()) { error in
+            if let error = error {
+                print("更新失敗: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("更新成功")
+                completion(true, nil)
+            }
+        }
+    }
+
+    static func createUser(
+        user: User,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(user.uid)
+
+        userRef.setData(user.toDictionary()) { error in
+            if let error = error {
+                print("建立失敗: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("建立成功")
+                completion(true, nil)
+            }
+        }
+    }
+
+    // article (CRU)
+    static func fetchSingleArticle(
+        articleId: String,
+        completion: @escaping (Bool, Error?, Article?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let articleRef = db.collection("articles").document(articleId)
+
+        articleRef.getDocument { document, error in
+            if let error = error {
+                completion(false, error, nil)
+                return
+            }
+
+            guard let document = document, document.exists,
+                let article = Utils.docToArticle(doc: document)
+            else {
+                completion(false, nil, nil)
+                return
+            }
+            completion(true, nil, article)
+        }
+    }
+
+    static func fetchAuthorAllArticles(
+        authorUid: String,
+        completion: @escaping (Bool, Error?, [Article]?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let articlesRef = db.collection("articles")
+
+        articlesRef
+            .whereField("authorUid", isEqualTo: authorUid)
+            .order(by: "time", descending: true)  // 可選：照時間排序
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(false, error, nil)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    completion(false, nil, nil)
+                    return
+                }
+                let articles = documents.compactMap { doc in
+                    Utils.docToArticle(doc: doc)
+                }
+
+                completion(true, nil, articles)
+            }
+    }
+
+    static func createArticle(
+        article: Article,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let data = article.toDictionary()
+
+        // 用自動產生的 document ID
+        db.collection("articles").addDocument(data: data) { error in
+            if let error = error {
+                completion(false, error)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
+
+    static func updateArticle(
+        article: Article,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let data = article.toDictionary()
+
+        db.collection("articles").document(article.id).setData(
+            data,
+            merge: true
+        ) {
+            error in
+            if let error = error {
+                completion(false, error)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
+
+    // comment (CR)
+    static func createComment(
+        comment: Comment,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let data = comment.toDictionary()
+
+        db.collection("comments").addDocument(data: data) { error in
+            if let error = error {
+                completion(false, error)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
+
+    static func fetchComments(
+        for articleId: String,
+        completion: @escaping (Bool, Error?, [Comment]?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        db.collection("comments")
+            .whereField("articleId", isEqualTo: articleId)
+            .order(by: "time", descending: false)  // 按時間排序（最舊到最新）
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(false, error, nil)
+                    return
+                }
+                guard let docs = snapshot?.documents else {
+                    completion(true, nil, [])  // 沒留言回空陣列
+                    return
+                }
+
+                let comments = docs.compactMap { doc -> Comment? in
+                    return Comment(
+                        id: doc.documentID,
+                        articleId: doc.data()["articleId"] as? String ?? "",
+                        text: doc.data()["text"] as? String ?? "",
+                        time: doc.data()["time"] as? Timestamp
+                            ?? Timestamp(date: Date()),
+                        uid: doc.data()["uid"] as? String ?? ""
+                    )
+                }
+                completion(true, nil, comments)
+            }
+    }
+
+    // other
+    static func uploadImage(
+        image: UIImage,
+        completion: @escaping (String?, Error?) -> Void
+    ) {
+        guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+            completion(
+                nil,
+                NSError(
+                    domain: "ImgbbUploader",
+                    code: 0,
+                    userInfo: [NSLocalizedDescriptionKey: "圖片轉換失敗"]
+                )
+            )
+            return
+        }
+        let apiKey = "6fc6470e718bf330be05fa4b4d4995f8"
+
+        let url = URL(string: "https://api.imgbb.com/1/upload?key=\(apiKey)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        let boundary = UUID().uuidString
+        request.setValue(
+            "multipart/form-data; boundary=\(boundary)",
+            forHTTPHeaderField: "Content-Type"
+        )
+
+        var body = Data()
+        body.append("--\(boundary)\r\n")
+        body.append(
+            "Content-Disposition: form-data; name=\"image\"; filename=\"image.jpg\"\r\n"
+        )
+        body.append("Content-Type: image/jpeg\r\n\r\n")
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n")
+
+        request.httpBody = body
+        request.timeoutInterval = 60
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(nil, error)
+                return
+            }
+
+            guard let data = data else {
+                completion(
+                    nil,
+                    NSError(
+                        domain: "ImgbbUploader",
+                        code: 0,
+                        userInfo: [NSLocalizedDescriptionKey: "沒有回傳資料"]
+                    )
+                )
+                return
+            }
+
+            do {
+                let decoded = try JSONDecoder().decode(
+                    ImgbbResponse.self,
+                    from: data
+                )
+                completion(decoded.data.url, nil)
+            } catch {
+                completion(nil, error)
+            }
+        }.resume()
     }
 }
