@@ -155,7 +155,7 @@ struct CommunityTabBar: View {
                 }   
             }
         }
-        .background(Color.black)
+        .background(Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
