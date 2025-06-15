@@ -139,6 +139,50 @@ class FirebaseService {
             completion(true, nil, article)
         }
     }
+    
+    static func fetchTodayArticles(
+        completion: @escaping (Bool, Error?, [Article]?) -> Void
+    ) {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            completion(false, nil, nil)
+            return
+        }
+
+        let db = Firestore.firestore()
+        let articleRef = db.collection("articles")
+
+        let calendar = Calendar.current
+        let now = Date()
+        guard let startOfDay = calendar.date(from: calendar.dateComponents([.year, .month, .day], from: now)),
+              let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+            completion(false, nil, nil)
+            return
+        }
+
+        let startTimestamp = Timestamp(date: startOfDay)
+        let endTimestamp = Timestamp(date: endOfDay)
+
+        articleRef
+            .whereField("authorUid", isEqualTo: userId)
+            .whereField("time", isGreaterThanOrEqualTo: startTimestamp)
+            .whereField("time", isLessThan: endTimestamp)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(false, error, nil)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    completion(false, nil, nil)
+                    return
+                }
+
+                let articles = documents.compactMap { Utils.docToArticle(doc: $0) }
+                completion(true, nil, articles)
+            }
+    }
+
+
 
     static func fetchAuthorAllArticles(
         authorUid: String,
@@ -204,7 +248,57 @@ class FirebaseService {
             }
         }
     }
+    
+    
+    static func searchArticles(
+        keyword: String?,
+        startDate: Date?,
+        endDate: Date?,
+        completion: @escaping (Bool, Error?, [Article]?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let articlesRef = db.collection("articles")
 
+        var query: Query = articlesRef
+
+        // 處理時間範圍
+        if let start = startDate {
+            query = query.whereField("time", isGreaterThanOrEqualTo: Timestamp(date: start))
+        }
+        if let end = endDate {
+            query = query.whereField("time", isLessThanOrEqualTo: Timestamp(date: end))
+        }
+
+        // 處理關鍵字
+        let keywordTrimmed = keyword?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let hasKeyword = !keywordTrimmed.isEmpty
+
+        if hasKeyword {
+            let endKeyword = keywordTrimmed + "\u{f8ff}"
+            query = query.order(by: "title")
+                .start(at: [keywordTrimmed])
+                .end(at: [endKeyword])
+        } else {
+            // 沒關鍵字時，order by createdAt 避免無序查詢
+            query = query.order(by: "time")
+        }
+
+        query.getDocuments { snapshot, error in
+            if let error = error {
+                completion(false, error, nil)
+                return
+            }
+
+            guard let documents = snapshot?.documents else {
+                completion(false, nil, nil)
+                return
+            }
+
+            let articles = documents.compactMap { Utils.docToArticle(doc: $0) }
+            completion(true, nil, articles)
+        }
+    }
+    
     // comment (CR)
     static func createComment(
         comment: Comment,
