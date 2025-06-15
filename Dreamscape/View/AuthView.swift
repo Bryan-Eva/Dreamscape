@@ -4,7 +4,8 @@
 //
 //  Created by 卓柏辰 on 2025/6/13.
 //
-
+import FirebaseAuth
+import FirebaseFirestore
 import SwiftUI
 
 // MARK: - Main View
@@ -56,6 +57,11 @@ struct AuthView: View {
             }
             .padding()
         }
+        .onAppear {
+            // call Backend API to check if user is logged in
+            isLoginMode = FirebaseAuth.Auth.auth().currentUser != nil
+            // print("User is logged in: \(isLoginMode)")  
+        }
     }
 }
 
@@ -66,6 +72,8 @@ struct LogInView: View {
 
     @State private var email = ""
     @State private var password = ""
+    @State private var showAlert = false
+    @State private var alertMessage = ""
 
     var body: some View {
         VStack(spacing: 24) {
@@ -88,6 +96,17 @@ struct LogInView: View {
             // Login Button
             Button(action: {
                 // TODO: Handle login action
+                FirebaseService.userLogin(mail: email, password: password) { success, error in
+                    if success {
+                        alertMessage = "Login successful!"
+                        email = ""
+                        password = ""
+                    } else {
+                        alertMessage = error?.localizedDescription ?? "Unknown error"
+                    }
+                    showAlert = true
+
+                }
             }) {
                 Text("Log In")
                     .fontWeight(.bold)
@@ -112,6 +131,13 @@ struct LogInView: View {
         }
         .padding(.vertical, 32)
         .animation(nil, value: UUID())
+        .alert("Notification", isPresented: $showAlert) {
+            Button("OK") {
+                showAlert = false
+            }
+        } message: {
+            Text(alertMessage)
+        }
     }
 }
 
@@ -121,6 +147,8 @@ struct SignUpView: View  {
 
     @State private var email = ""
     @State private var password = ""
+    @State private var showAlert = false
+    @State private var alertMessage = ""
     
     var body: some View {
         VStack(spacing: 24) {
@@ -143,6 +171,17 @@ struct SignUpView: View  {
             // Signup Button
             Button(action: {
                 // TODO: Handle signup action
+                FirebaseService.userRegister(mail: email, password: password) { success, error in
+                    if success {
+                        alertMessage = "Registration successful!"
+                        email = ""
+                        password = ""
+                    } else {
+                        alertMessage = error?.localizedDescription ?? "Unknown error"
+                    }
+                    showAlert = true
+                }
+                    
             }) {
                 Text("Sign Up")
                     .fontWeight(.bold)
@@ -167,6 +206,13 @@ struct SignUpView: View  {
         }
         .padding(.vertical, 32)
         .animation(nil, value: UUID())
+        .alert("Notification", isPresented: $showAlert) {
+            Button("OK") {
+                showAlert = false
+            }
+        } message: {
+            Text(alertMessage)
+        }
     }
 }
 

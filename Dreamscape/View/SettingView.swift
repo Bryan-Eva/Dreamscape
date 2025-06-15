@@ -5,14 +5,18 @@
 //  Created by 卓柏辰 on 2025/6/13.
 //
 
+import FirebaseAuth
+import FirebaseFirestore
 import SwiftUI
 
 // MARK: SettingView
 struct SettingView: View {
-    @State private var isLoggedIn = true // Simulate login state
-    @State private var userName: String = "User123" // Simulate user name
-    @State private var userImage: String? = "dream_image" // Simulate user image
+    @State private var isLoggedIn = false
+    @State private var userName: String? = ""
+    @State private var userImage: String? = ""
     @State private var navPath = NavigationPath()
+    @State private var showAlert = false
+    @State private var alertMsg = ""
 
     var body: some View {
         NavigationStack(path: $navPath) {
@@ -38,10 +42,17 @@ struct SettingView: View {
                                 .frame(width: 94, height: 94)
                                 .foregroundColor(.white.opacity(0.8))
                         }
-                        Text(isLoggedIn ? userName : "Guest")
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                            .padding(.top, 4)
+                        if let name = userName, !name.isEmpty {
+                            Text(name)
+                                .font(.title2.bold())
+                                .foregroundColor(.white)
+                                .padding(.top, 4)
+                        } else {
+                            Text("Guest")
+                                .font(.title2.bold())
+                                .foregroundColor(.white)
+                                .padding(.top, 4)
+                        }
                     }
                     .padding(.top, 44)
 
@@ -64,10 +75,21 @@ struct SettingView: View {
 
                     Button(action: {
                         if isLoggedIn {
-                            // TODO: Call API to log out
+                            // Clear user data and log out
                             isLoggedIn = false
                             userName = "Guest"
                             userImage = nil
+                            // TODO: Call API to log out
+                            FirebaseService.userLogout { success, error in
+                                if success {
+                                    print("User logged out successfully.")
+                                    alertMsg = "Logged out successfully."
+                                } else if let error = error {
+                                    print("Error logging out: \(error.localizedDescription)")
+                                    alertMsg = "Error logging out: \(error.localizedDescription)"
+                                }
+                                showAlert = true
+                            }
                         } else {
                             navPath.append("Auth")
                         }
@@ -85,6 +107,11 @@ struct SettingView: View {
                 }
                 .padding(.horizontal, 28)
             }
+            .alert("Notification", isPresented: $showAlert) {
+                Button("OK") { }
+            } message: {
+                Text(alertMsg)
+            }
             .navigationDestination(for: String.self) { value in 
                 switch value {
                 case "MyDreams":
@@ -98,6 +125,30 @@ struct SettingView: View {
                     AuthView()
                 default:
                     EmptyView()
+                }
+            }
+        }
+        .onAppear{
+            // Check if user is logged in
+            guard FirebaseAuth.Auth.auth().currentUser != nil else {
+                isLoggedIn = false
+                userName = "Guest"
+                userImage = nil
+                return
+            }
+            isLoggedIn = FirebaseAuth.Auth.auth().currentUser != nil
+            guard let uid = FirebaseAuth.Auth.auth().currentUser?.uid else { return }
+            
+            // Fetch user data from Firestore
+            FirebaseService.fetchSingleUser(uid: uid) { success, error, user in
+                if success, let user = user {
+                    self.userName = user.name
+                    self.userImage = user.avatar // Assuming avatar is the image URL or name
+                    print("User data fetched successfully: \(user)")
+                } else if let error = error {
+                    print("Error fetching user data: \(error.localizedDescription)")
+                } else {
+                    print("Error fetching user data: \(String(describing: error))")
                 }
             }
         }
@@ -128,17 +179,14 @@ struct SettingMenuRow: View {
 
 struct MyDreamsView: View {
     // TODO: Get the user's dreams from the backend API
-    let mockPosts: [CommunityPost] = [
-        .init(imageName: "dream_image", title: "迷幻森林", text: "在森林裡與動物對話", likes: 123),
-        .init(imageName: "dream_image", title: "天空之城", text: "飄浮的島嶼和水晶橋", likes: 88)
-    ]
+    @State private var myDreams: [CommunityPost] = []
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                ForEach(mockPosts) { post in
+                ForEach(myDreams) { post in
                     // TODO: Replace real post detail view
-                    NavigationLink(destination: DetailView(post: post)) {
+                    NavigationLink(destination: PostDetailView(articleId: post.articleId)) {
                         PostRowView(post: post)
                     }
                 }
@@ -147,22 +195,50 @@ struct MyDreamsView: View {
         }
         .navigationTitle("My Dreams")
         .background(Color(red: 25/255, green: 24/255, blue: 40/255).ignoresSafeArea())
+        .onAppear {
+            // Get the user's dreams from the backend API
+            // First Get the user's ID
+            guard let uid = FirebaseAuth.Auth.auth().currentUser?.uid else {
+                print("User not logged in")
+                return
+            }
+            // Then call the API to fetch user's dreams
+            FirebaseService.fetchAuthorAllArticles(authorUid: uid) { success, error, articles in
+                if success {
+                    if let articles = articles, !articles.isEmpty {
+                        // Map articles to CommunityPost
+                        myDreams = articles.map { article in
+                            CommunityPost(
+                                articleId: article.id,
+                                imageName: article.image,
+                                title: article.title,
+                                text: article.text,
+                                likes: article.likedCount
+                            )
+                        }
+                    }
+                } else if let error = error {
+                    print("Error fetching user's dreams: \(String(describing: error))")
+                } else {
+                    print("No dreams found for this user.")
+                }
+            }
+        }
     }
 }
 
 // MARK: - Saved Dreams View
 struct SavedDreamsView: View {
     // TODO: Get the user's saved dreams from the backend API
-    let mockPosts: [CommunityPost] = [
-        .init(imageName: "dream_image", title: "三月夜夢", text: "夜空閃耀的星辰與月亮", likes: 77)
-    ]
+    @State private var savedArticles: [String] = [] // Array of article IDs
+    @State private var savedDreams: [CommunityPost] = []
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                ForEach(mockPosts) { post in
+                ForEach(savedDreams) { post in
                     // TODO: Replace real post detail view
-                    NavigationLink(destination: DetailView(post: post)) {
+                    NavigationLink(destination: PostDetailView(articleId: post.articleId)) {
                         PostRowView(post: post)
                     }
                 }
@@ -171,6 +247,45 @@ struct SavedDreamsView: View {
         }
         .navigationTitle("Saved Dreams")
         .background(Color(red: 25/255, green: 24/255, blue: 40/255).ignoresSafeArea())
+        .onAppear {
+            // Get the user's saved dreams from the backend API
+            // First Get the user's ID and Get user info of savedArticles
+            guard let uid = FirebaseAuth.Auth.auth().currentUser?.uid else {
+                print("User not logged in")
+                return
+            }
+            FirebaseService.fetchSingleUser(uid: uid) { success, error, user in
+                if success, let user = user {
+                    // Assuming user.savedArticles is an array of article IDs
+                    self.savedArticles = user.savedArticles
+                    print("User's saved articles: \(self.savedArticles)")
+                } else if let error = error {
+                    print("Error fetching user's saved articles: \(error.localizedDescription)")
+                } else {
+                    print("No saved articles found for this user.")
+                }
+            }
+            // And fetch all saved articles by the user savedArticles(String Array)
+            for articleId in savedArticles {
+                FirebaseService.fetchSingleArticle(articleId: articleId) { success, error, article in
+                    if success, let article = article {
+                        // Map articles to CommunityPost
+                        let post = CommunityPost(
+                            articleId: article.id,
+                            imageName: article.image,
+                            title: article.title,
+                            text: article.text,
+                            likes: article.likedCount
+                        )
+                        savedDreams.append(post)
+                    } else if let error = error {
+                        print("Error fetching saved article \(articleId): \(error.localizedDescription)")
+                    } else {
+                        print("No article found for ID \(articleId).")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -288,5 +403,13 @@ struct PostRowView: View {
         .padding(10)
         .background(Color.white.opacity(0.07))
         .cornerRadius(16)
+    }
+}
+
+// MARK: - Preview
+struct SettingView_Previews: PreviewProvider {
+    static var previews: some View {
+        SettingView()
+            .preferredColorScheme(.dark)
     }
 }
