@@ -81,7 +81,7 @@ struct ArticleView: View {
                         error in
                         if success {
                             loadMyArticles()
-                        }else{
+                        } else {
                             print(error?.localizedDescription)
                         }
                     }
@@ -111,8 +111,29 @@ struct ArticleView: View {
             return
         }
 
+        let calendar = Calendar.current
+        let now = Date()
+
+        // 今天開始時間（00:00:00）
+        let startOfDay = calendar.startOfDay(for: now)
+
+        // 明天開始時間（明天 00:00:00）
+        guard
+            let endOfDay = calendar.date(
+                byAdding: .day,
+                value: 1,
+                to: startOfDay
+            )
+        else {
+            fatalError("無法取得明天日期")
+        }
+
         isLoading = true
-        FirebaseService.fetchTodayArticles() {
+        FirebaseService.searchArticles(
+            keyword: "Test",
+            startDate: nil,
+            endDate: endOfDay
+        ) {
             success,
             error,
             articles in
