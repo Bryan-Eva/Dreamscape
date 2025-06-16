@@ -322,8 +322,17 @@ struct ChangePasswordView: View {
                     return
                 }
                 // TODO: Call API to change password
-                alertMsg = "New Password was sented to the server."
-                showAlert = true
+                FirebaseService.changePassword(newPassword: newPassword){ success, error in
+                    if success{
+                        alertMsg = "Password changed successfully"
+                        showAlert = true
+                    }else{
+                        alertMsg = "Something went wrong while changing the password"
+                        showAlert = true
+                    }
+                }
+//                alertMsg = "New Password was sented to the server."
+//                showAlert = true
             }) {
                 Text("Confirm Change")
                     .font(.title3.weight(.semibold))
