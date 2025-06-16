@@ -53,6 +53,26 @@ class FirebaseService {
     static func isUserLoggedIn() -> Bool {
         return Auth.auth().currentUser != nil
     }
+    
+    static func changePassword(
+        newPassword: String,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        guard let user = Auth.auth().currentUser else {
+            completion(false, NSError(domain: "ChangePassword", code: 401, userInfo: [NSLocalizedDescriptionKey: "尚未登入"]))
+            return
+        }
+
+        user.updatePassword(to: newPassword) { error in
+            if let error = error {
+                print("變更密碼失敗: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("變更密碼成功")
+                completion(true, nil)
+            }
+        }
+    }
 
     // user (CRU)
     static func fetchSingleUser(
