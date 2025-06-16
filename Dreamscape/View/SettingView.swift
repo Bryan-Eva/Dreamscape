@@ -11,6 +11,7 @@ import SwiftUI
 
 // MARK: SettingView
 struct SettingView: View {
+    @EnvironmentObject private var appViewModel: AppViewModel
     @State private var isLoggedIn = false
     @State private var userName: String? = ""
     @State private var userImage: String? = ""
@@ -130,13 +131,13 @@ struct SettingView: View {
         }
         .onAppear{
             // Check if user is logged in
-            guard FirebaseAuth.Auth.auth().currentUser != nil else {
+            guard appViewModel.isLoggedIn != nil else {
                 isLoggedIn = false
                 userName = "Guest"
                 userImage = nil
                 return
             }
-            isLoggedIn = FirebaseAuth.Auth.auth().currentUser != nil
+            isLoggedIn = appViewModel.isLoggedIn
             guard let uid = FirebaseAuth.Auth.auth().currentUser?.uid else { return }
             
             // Fetch user data from Firestore
@@ -420,5 +421,6 @@ struct SettingView_Previews: PreviewProvider {
     static var previews: some View {
         SettingView()
             .preferredColorScheme(.dark)
+            .environmentObject(AppViewModel()) // Provide AppViewModel for preview
     }
 }

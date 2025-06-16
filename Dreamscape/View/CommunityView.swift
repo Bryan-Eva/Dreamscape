@@ -15,6 +15,8 @@ struct CommunityPost: Identifiable,  Equatable {
     let title: String
     let text: String
     let likes: Int
+    // topics(Optiona) only for Explore Section when filtering by topic
+    var topics: [String]?
 }
 
 struct CommunityTopic: Identifiable, Equatable {
@@ -39,35 +41,12 @@ enum CommunityTab: Int, CaseIterable {
 // MARK: Main CommunityView
 struct CommunityView: View {
     @State private var selectedTab: CommunityTab = .popular
-
-    // User to Topics Images (fix)
-    let topicImages: [[String]] = [
-        ["dream_image", "dream_image", "dream_image", "dream_image", "dream_image"],
-        ["dream_image", "dream_image", "dream_image", "dream_image", "dream_image"],
-        ["dream_image", "dream_image", "dream_image", "dream_image", "dream_image"]
-    ]
-
+    @State private var allPosts: [CommunityPost] = []
+    @State private var allTopics: [CommunityTopic] = []
+    @State private var top5Posts: [CommunityPost] = []
+    @State private var top5Topics: [CommunityTopic] = []
+    @State private var topicCounts: [String: Int] = [:]
     @State private var topicSetIndex = 0
-
-    // Sample Data for Popular Posts
-    let mockPopularPosts: [CommunityPost] = [
-        .init(articleId: "0", imageName: "dream_image", title: "奇幻夢", text: "在充滿魔法的古堡裡探險", likes: 142),
-        .init(articleId: "1", imageName: "dream_image", title: "在一座城市的夢", text: "穿梭在現代與虛幻之間", likes: 105),
-        .init(articleId: "2", imageName: "dream_image", title: "充滿奇異月亮的夢", text: "夜空下的三個新月", likes: 89)
-    ]
-    
-    // Sample Data for Topics
-    let mockTopics: [String] = ["奇幻夢", "現實夢", "詭異夢", "冒險夢", "溫馨夢"]
-
-    // Sample Data for Explore/Topic Posts
-    let mockAllPosts: [CommunityPost] = [
-        .init(articleId: "3", imageName: "dream_image", title: "奇幻夢", text: "在充滿魔法的古堡裡探險", likes: 142),
-        .init(articleId: "4", imageName: "dream_image", title: "現實夢", text: "現實交錯的奇妙瞬間", likes: 95),
-        .init(articleId: "5",imageName: "dream_image", title: "冒險夢", text: "一場前往未知世界的冒險", likes: 80),
-        .init(articleId: "6",imageName: "dream_image", title: "詭異夢", text: "黑暗走廊盡頭的綠光", likes: 72)
-    ]
-
-    // State
     @State private var currentTopicFilter: String? = nil
 
     // Switch to Explore Tab and with topic filter
@@ -101,10 +80,8 @@ struct CommunityView: View {
                     ZStack {
                         if selectedTab == .popular {
                             PopularAndTopicsSection(
-                                posts: mockPopularPosts,
-                                topics: Array(mockTopics.prefix(5)).enumerated().map { idx, name in 
-                                    CommunityTopic(name: name, imageName: topicImages[topicSetIndex % topicImages.count][idx])
-                                },
+                                posts: top5Posts,
+                                topics: top5Topics,
                                 onSelectTopic: { topic in
                                     goToExplore(with: topic.name)
                                 }
@@ -113,7 +90,7 @@ struct CommunityView: View {
                         }
                         if selectedTab == .explore {
                             ExploreSection(
-                                allPosts: mockAllPosts,
+                                allPosts: allPosts,
                                 topicFilter: currentTopicFilter,
                                 onClearTopic: {
                                     currentTopicFilter = nil
@@ -125,6 +102,42 @@ struct CommunityView: View {
                     .animation(.easeInOut, value: selectedTab)
 
                     Spacer()
+                }
+            }.onAppear {
+                // Reset topic index when view appears
+                topicSetIndex = 0
+                // call Backend API to all posts and topics, and set the top 5 posts by likes and topics
+                FirebaseService.searchArticles(keyword: nil, startDate: nil, endDate: nil) { success, error, articles in
+                    if error != nil {
+                        print("Error fetching articles: \(error!.localizedDescription)")
+                        return
+                    }
+                    guard success, let articles = articles else {
+                        print("No articles found")
+                        return
+                    }
+                    // Convert articles to CommunityPost
+                    self.allPosts = articles.map { article in
+                        CommunityPost(articleId: article.id, imageName: article.image, title: article.title, text: article.text, likes: article.likedCount, topics: article.topics)
+                    }
+                    // First: Get and Store all topics from articles
+                    let topicsSet = Set(articles.flatMap { $0.topics })
+                    self.allTopics = topicsSet.map { topicName in
+                        // Use a default image for now, can be replaced with actual images later
+                        let imageName = "dream_image" // Placeholder image
+                        return CommunityTopic(name: topicName, imageName: imageName)
+                    }
+                    // And count each topic's number of occurrences when iterating through articles
+                    self.topicCounts = [:]
+                    for article in articles {
+                        for topic in article.topics {
+                            topicCounts[topic, default: 0] += 1
+                        }
+                    }
+                    // Second: Sort and get top 5 posts by likes
+                    self.top5Posts = self.allPosts.sorted(by: { $0.likes > $1.likes }).prefix(5).map { $0 }
+                    // Third: Sort and get top 5 topics by occurrences
+                    self.top5Topics = self.allTopics.sorted(by: { topicCounts[$0.name, default: 0] > topicCounts[$1.name, default: 0] }).prefix(5).map { $0 }
                 }
             }
         }
@@ -179,7 +192,7 @@ struct PopularAndTopicsSection: View {
 
                 VStack(spacing: 12) {
                     ForEach(posts) { post in
-                        NavigationLink(destination: DetailView(post: post)) {
+                        NavigationLink(destination: PostDetailView(articleId: post.articleId)) {
                             CommunityPostRowView(post: post)
                         }
                     }
@@ -219,8 +232,9 @@ struct ExploreSection: View {
     let onClearTopic: () -> Void
 
     var filteredPosts: [CommunityPost] {
+        // we only return match at leat one topic in posts
         if let topic = topicFilter, !topic.isEmpty {
-            return allPosts.filter { $0.title == topic }
+            return allPosts.filter { $0.topics?.contains(topic) == true }
         }
         return allPosts
     }
@@ -248,7 +262,7 @@ struct ExploreSection: View {
             ScrollView {
                 VStack(spacing: 14) {
                     ForEach(filteredPosts) { post in
-                        NavigationLink(destination: DetailView(post: post)) {
+                        NavigationLink(destination: PostDetailView(articleId: post.articleId)) {
                             CommunityPostRowView(post: post)
                         }
                     }
@@ -327,5 +341,13 @@ struct CommunityTopicCardView: View {
         .background(Color.white.opacity(0.06))
         .cornerRadius(12)
         .shadow(radius:1)
+    }
+}
+
+// Preview for CommunityView
+struct CommunityView_Previews: PreviewProvider {
+    static var previews: some View {
+        CommunityView()
+            .preferredColorScheme(.dark)
     }
 }
