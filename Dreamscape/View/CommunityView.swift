@@ -10,6 +10,7 @@ import SwiftUI
 // MARK: - Data Model
 struct CommunityPost: Identifiable,  Equatable {
     let id = UUID()
+    let articleId: String
     let imageName: String
     let title: String
     let text: String
@@ -50,9 +51,9 @@ struct CommunityView: View {
 
     // Sample Data for Popular Posts
     let mockPopularPosts: [CommunityPost] = [
-        .init(imageName: "dream_image", title: "奇幻夢", text: "在充滿魔法的古堡裡探險", likes: 142),
-        .init(imageName: "dream_image", title: "在一座城市的夢", text: "穿梭在現代與虛幻之間", likes: 105),
-        .init(imageName: "dream_image", title: "充滿奇異月亮的夢", text: "夜空下的三個新月", likes: 89)
+        .init(articleId: "0", imageName: "dream_image", title: "奇幻夢", text: "在充滿魔法的古堡裡探險", likes: 142),
+        .init(articleId: "1", imageName: "dream_image", title: "在一座城市的夢", text: "穿梭在現代與虛幻之間", likes: 105),
+        .init(articleId: "2", imageName: "dream_image", title: "充滿奇異月亮的夢", text: "夜空下的三個新月", likes: 89)
     ]
     
     // Sample Data for Topics
@@ -60,10 +61,10 @@ struct CommunityView: View {
 
     // Sample Data for Explore/Topic Posts
     let mockAllPosts: [CommunityPost] = [
-        .init(imageName: "dream_image", title: "奇幻夢", text: "在充滿魔法的古堡裡探險", likes: 142),
-        .init(imageName: "dream_image", title: "現實夢", text: "現實交錯的奇妙瞬間", likes: 95),
-        .init(imageName: "dream_image", title: "冒險夢", text: "一場前往未知世界的冒險", likes: 80),
-        .init(imageName: "dream_image", title: "詭異夢", text: "黑暗走廊盡頭的綠光", likes: 72)
+        .init(articleId: "3", imageName: "dream_image", title: "奇幻夢", text: "在充滿魔法的古堡裡探險", likes: 142),
+        .init(articleId: "4", imageName: "dream_image", title: "現實夢", text: "現實交錯的奇妙瞬間", likes: 95),
+        .init(articleId: "5",imageName: "dream_image", title: "冒險夢", text: "一場前往未知世界的冒險", likes: 80),
+        .init(articleId: "6",imageName: "dream_image", title: "詭異夢", text: "黑暗走廊盡頭的綠光", likes: 72)
     ]
 
     // State
