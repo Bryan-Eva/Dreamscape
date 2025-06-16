@@ -10,7 +10,8 @@ import SwiftUI
 
 // MARK: - Main View
 struct AuthView: View {
-    @State private var isLoginMode: Bool = true
+    @EnvironmentObject private var appViewModel: AppViewModel
+    @State private var isLoginMode: Bool = true // Default to login mode, if user is not logged in
 
     var body: some View {
         ZStack {
@@ -40,6 +41,7 @@ struct AuthView: View {
                                 isLoginMode = false
                             }
                         }
+                        .environmentObject(appViewModel)
                         .transition(.move(edge: .trailing))
                     } else {
                         SignUpView {
@@ -59,7 +61,7 @@ struct AuthView: View {
         }
         .onAppear {
             // call Backend API to check if user is logged in
-            isLoginMode = FirebaseAuth.Auth.auth().currentUser != nil
+            isLoginMode = appViewModel.isLoggedIn
             // print("User is logged in: \(isLoginMode)")  
         }
     }
@@ -69,6 +71,7 @@ struct AuthView: View {
 // MARK: - Login Sub View
 struct LogInView: View {
     var switchToSignup: () -> Void
+    @EnvironmentObject var appViewModel: AppViewModel 
 
     @State private var email = ""
     @State private var password = ""
@@ -134,6 +137,9 @@ struct LogInView: View {
         .alert("Notification", isPresented: $showAlert) {
             Button("OK") {
                 showAlert = false
+                if alertMessage == "Login successful!" {
+                    appViewModel.isLoggedIn = true
+                }
             }
         } message: {
             Text(alertMessage)
@@ -282,5 +288,6 @@ struct AuthView_Previews: PreviewProvider {
     static var previews: some View {
         AuthView()
             .preferredColorScheme(.dark)
+            .environmentObject(AppViewModel()) // Provide AppViewModel for preview
     }
 }

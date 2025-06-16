@@ -10,6 +10,7 @@ import SwiftUI
 // MARK: - Data Model
 struct DreamSearchResult: Identifiable, Equatable {
     let id = UUID()
+    let articleId: String
     let title: String
     let text: String
 }
@@ -28,13 +29,6 @@ struct SearchView: View {
     @State private var endDate: Date = Date()
     @State private var results: [DreamSearchResult] = []
     @State private var isSearching = false
-
-    let mockResults: [DreamSearchResult] = [
-        .init(title: "Floating City", text: "I was in a city suspended in the skies with floating buildings and bridges."),
-        .init(title: "Tidal Wave", text: "A massive tidal wave was approaching the shore, and I was running away from it."),
-        .init(title: "Walking on Clouds", text: "I dreamt of strolling through the sky, walking on soft, fluffy clouds."),
-        .init(title: "Lost in a Maze", text: "I found myself wandering through an endless labyrinth of walls.")
-    ]
 
 
     var body: some View {
@@ -103,7 +97,47 @@ struct SearchView: View {
                         // TODO: call Backend API with keyword or date range
                         isSearching = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            self.results = mockResults
+                            if mode == .normal {                               
+                                print("Searching by keyword: \(keyword)")
+                                // Search by keyword
+                                FirebaseService.searchArticles(keyword: keyword, startDate: nil, endDate: nil) { success, error, articles in
+                                    if let error = error {
+                                        print("Error searching articles: \(error.localizedDescription)")
+                                        self.isSearching = false
+                                        return
+                                    }
+                                    guard let articles = articles else {
+                                        self.results = []
+                                        self.isSearching = false
+                                        return
+                                    }
+                                    
+                                    // Convert articles to search results
+                                    self.results = articles.map { article in
+                                        DreamSearchResult(articleId: article.id, title: article.title, text: article.text)
+                                    }
+                                }
+                            } else {
+                                print("Searching by date range: \(startDate) to \(endDate)")
+                                // Search by date range
+                                FirebaseService.searchArticles(keyword: "", startDate: startDate, endDate: endDate) { sucess, error, articles in
+                                    if let error = error {
+                                        print("Error searching articles: \(error.localizedDescription)")
+                                        self.isSearching = false
+                                        return
+                                    }
+                                    guard let articles = articles else {
+                                        self.results = []
+                                        self.isSearching = false
+                                        return
+                                    }
+                                    
+                                    // Convert articles to search results
+                                    self.results = articles.map { article in
+                                        DreamSearchResult(articleId: article.id, title: article.title, text: article.text)
+                                    }                                   
+                                }
+                            }
                             self.isSearching = false
                         }
                     }) {
@@ -143,10 +177,12 @@ struct SearchView: View {
                                     .font(.headline)
                                     .padding(.horizontal)
                                     .padding(.top, 8)
-                                
+
+                                // Each result is a DreamSearchResult
                                 ForEach(results) { result in
-                                    SearchResultView(result: result)
-                                        .padding(.horizontal)                                    
+                                    NavigationLink(destination: PostDetailView(articleId: result.articleId)) {
+                                        SearchResultView(result: result)
+                                    }
                                 }
                             }
                             .padding(.bottom, 32)
