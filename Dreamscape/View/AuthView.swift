@@ -176,7 +176,16 @@ struct SignUpView: View  {
                         alertMessage = "Registration successful!"
                         email = ""
                         password = ""
-                    } else {
+                        let uid = Auth.auth().currentUser!.uid
+                        let newUser = User(uid: uid, name: "User \(uid)", avatar: "", createdAt: Timestamp(date: Date()), likedArticles: [], savedArticles: [])
+                        FirebaseService.createUser(user: newUser){ success, error in
+                            if success{
+                                alertMessage = "Create user successful!"
+                            }else{
+                                alertMessage = error?.localizedDescription ?? "Unknown error"
+                            }
+                        }
+                    }else{
                         alertMessage = error?.localizedDescription ?? "Unknown error"
                     }
                     showAlert = true

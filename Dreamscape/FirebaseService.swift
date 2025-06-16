@@ -53,6 +53,26 @@ class FirebaseService {
     static func isUserLoggedIn() -> Bool {
         return Auth.auth().currentUser != nil
     }
+    
+    static func changePassword(
+        newPassword: String,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        guard let user = Auth.auth().currentUser else {
+            completion(false, NSError(domain: "ChangePassword", code: 401, userInfo: [NSLocalizedDescriptionKey: "尚未登入"]))
+            return
+        }
+
+        user.updatePassword(to: newPassword) { error in
+            if let error = error {
+                print("變更密碼失敗: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("變更密碼成功")
+                completion(true, nil)
+            }
+        }
+    }
 
     // user (CRU)
     static func fetchSingleUser(
@@ -364,21 +384,17 @@ class FirebaseService {
 
     // other
     static func uploadImage(
-        image: UIImage,
-        completion: @escaping (String?, Error?) -> Void
-    ) {
+        image: UIImage
+    ) async throws -> String {
         guard let imageData = image.jpegData(compressionQuality: 0.5) else {
-            completion(
-                nil,
-                NSError(
-                    domain: "ImgbbUploader",
-                    code: 0,
-                    userInfo: [NSLocalizedDescriptionKey: "圖片轉換失敗"]
-                )
+            throw NSError(
+                domain: "ImgbbUploader",
+                code: 0,
+                userInfo: [NSLocalizedDescriptionKey: "圖片轉換失敗"]
             )
-            return
         }
-        let apiKey = "6fc6470e718bf330be05fa4b4d4995f8"
+
+        let apiKey = try await getAPIKey(for: "imgbb")
 
         let url = URL(string: "https://api.imgbb.com/1/upload?key=\(apiKey)")!
         var request = URLRequest(url: url)
@@ -402,34 +418,10 @@ class FirebaseService {
         request.httpBody = body
         request.timeoutInterval = 60
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(nil, error)
-                return
-            }
+        let (data, _) = try await URLSession.shared.data(for: request)
 
-            guard let data = data else {
-                completion(
-                    nil,
-                    NSError(
-                        domain: "ImgbbUploader",
-                        code: 0,
-                        userInfo: [NSLocalizedDescriptionKey: "沒有回傳資料"]
-                    )
-                )
-                return
-            }
-
-            do {
-                let decoded = try JSONDecoder().decode(
-                    ImgbbResponse.self,
-                    from: data
-                )
-                completion(decoded.data.url, nil)
-            } catch {
-                completion(nil, error)
-            }
-        }.resume()
+        let decoded = try JSONDecoder().decode(ImgbbResponse.self, from: data)
+        return decoded.data.url
     }
 
     static func getAPIKey(for keyName: String) async throws -> String {
