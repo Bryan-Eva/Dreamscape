@@ -184,3 +184,11 @@ struct SearchResultView: View {
         .shadow(radius: 1)
     }
 }
+
+// MARK: - Preview
+struct SearchView_Previews: PreviewProvider {
+    static var previews: some View {
+        SearchView()
+            .preferredColorScheme(.dark)
+    }
+}

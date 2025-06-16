@@ -4,7 +4,8 @@
 //
 //  Created by 卓柏辰 on 2025/6/13.
 //
-
+import FirebaseAuth
+import FirebaseFirestore
 import SwiftUI
 
 // MARK: - Data Model
@@ -21,7 +22,8 @@ struct CreateImageView: View {
     @State private var inputText: String = ""
     @State private var additionalInput: String = ""
     @State private var generatedResult: GeneratedResult? = nil
-
+    @State private var showAlert = false
+    @State private var alertMessage: String = ""
 
     var body: some View {
         ZStack {
@@ -139,7 +141,9 @@ struct CreateImageView: View {
                     }
 
                     Button(action: {
-                        // TODO: call Backend API to save image
+                        // TODO: call Backend API to save data
+                        guard let result = generatedResult else { return }
+                        createPost()
                     }) {
                         Text("Save")
                             .fontWeight(.bold)
@@ -155,6 +159,54 @@ struct CreateImageView: View {
             }
             .padding(.top, 32)
         }
+        .alert("Notification", isPresented: $showAlert) {
+            Button("OK") {
+                showAlert = false
+            }
+        } message: {
+            Text(alertMessage)
+        }
         .navigationBarTitle("Create Dream Image", displayMode: .inline)
+    }
+
+    func createPost() {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            print("User not logged in")
+            return
+        }
+
+        let newArticle = Article(
+            id: "",
+            authorUid: uid,
+            emotions: generatedResult?.emotions ?? [],
+            image: generatedResult?.imageName ?? "dream_image",
+            likedCount: 0,
+            savedCount: 0,
+            text: inputText,
+            time: Timestamp(date: Date()),
+            title: additionalInput.isEmpty ? "Dream Image" : additionalInput,
+            topics: generatedResult?.topics ?? [],
+            visible: true
+        )
+        print("Creating article with data: \(newArticle.toDictionary())")
+        print("Current user ID: \(uid)")
+        print("Article UID: \(newArticle.id)")
+        
+        FirebaseService.createArticle(article: newArticle) { success, error in
+            if success {
+                print("Article created successfully")
+                // Reset state after saving
+                inputText = ""
+                additionalInput = ""
+                generatedResult = nil
+                hasGenerated = false
+                showAlert = true
+                alertMessage = "Article created successfully!"
+            } else {
+                showAlert = true
+                alertMessage = "Error creating article: \(error?.localizedDescription ?? "Unknown error")"
+                print("Error creating article: \(error?.localizedDescription ?? "Unknown error")")
+            }
+        }
     }
 }
