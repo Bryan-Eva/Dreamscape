@@ -6,11 +6,12 @@
 //
 import FirebaseAuth
 import FirebaseFirestore
+
 import SwiftUI
 
 // MARK: - Data Model
 struct GeneratedResult: Equatable {
-    let imageName: String
+    var imageName: String
     let emotions: [String]
     let topics: [String]
 }
@@ -49,16 +50,33 @@ struct DreamTextEditor: View {
 struct GeneratedResultView: View {
     let result: GeneratedResult
     @Binding var additionalInput: String
+    @Binding var image:UIImage?
+    let onImageTap: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
-            Image(result.imageName)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: 220)
-                .cornerRadius(14)
-                .shadow(radius: 6)
-
+            if let img = image {
+                Image(uiImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: 220)
+                    .cornerRadius(14)
+                    .shadow(radius: 6)
+                    .onTapGesture {
+                        onImageTap()
+                    }
+            }else{
+                Image(result.imageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: 220)
+                    .cornerRadius(14)
+                    .shadow(radius: 6)
+                    .onTapGesture {
+                        onImageTap()
+                    }
+            }
+        
             HStack(spacing: 8) {
                 ForEach(result.emotions, id: \.self) { emotion in
                     Text(emotion)
@@ -102,7 +120,7 @@ struct ButtonBarView: View {
     let generatedResult: GeneratedResult?
     let inputText: String
     let onCreate: () -> Void
-    let onSave: () -> Void
+    let onSave: () async -> Void
 
     var body: some View {
         HStack(spacing: 16) {
@@ -116,8 +134,12 @@ struct ButtonBarView: View {
                     .cornerRadius(18)
             }
             .disabled(inputText.isEmpty || isLoading)
-
-            Button(action: onSave) {
+            
+            Button{
+                Task{
+                    await onSave()
+                }
+            }label: {
                 Text("Save")
                     .fontWeight(.bold)
                     .frame(maxWidth: .infinity)
@@ -142,6 +164,9 @@ struct CreateImageView: View {
     @State private var generatedResult: GeneratedResult? = nil
     @State private var showAlert = false
     @State private var alertMessage: String = ""
+    
+    @State private var showImagePicker = false
+    @State private var selectedImage: UIImage?
 
     var body: some View {
         ZStack {
@@ -159,7 +184,9 @@ struct CreateImageView: View {
                 }
 
                 if let result = generatedResult, hasGenerated, !isLoading {
-                    GeneratedResultView(result: result, additionalInput: $additionalInput)
+                    GeneratedResultView(result: result, additionalInput: $additionalInput,image: $selectedImage,onImageTap: {
+                        showImagePicker = true
+                    })
                 }
 
                 Spacer()
@@ -197,6 +224,14 @@ struct CreateImageView: View {
                     },
                     onSave: {
                         guard let result = generatedResult else { return }
+                        if let img = selectedImage{
+                            do{
+                                let url = try await FirebaseService.uploadImage(image: img)
+                                generatedResult?.imageName = url
+                            }catch{
+                                
+                            }
+                        }
                         createPost()
                     }
                 )
@@ -211,6 +246,14 @@ struct CreateImageView: View {
             Text(alertMessage)
         }
         .navigationBarTitle("Create Dream Image", displayMode: .inline)
+        .sheet(isPresented: $showImagePicker) {
+            PhotoPicker(selectedImage: $selectedImage)
+        }
+        .onChange(of: selectedImage) { newImage in
+            if let image = newImage {
+                self.selectedImage = image
+            }
+        }
     }
 
     func createPost() {
