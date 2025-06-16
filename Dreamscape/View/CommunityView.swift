@@ -281,13 +281,32 @@ struct CommunityPostRowView: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            Image(post.imageName)
-                .resizable()
-                .aspectRatio(1, contentMode: .fill)
-                .frame(width: 74, height: 74)
-                .clipped()
-                .cornerRadius(12)
-            
+            if post.imageName.hasPrefix("http"){
+                AsyncImage(url: URL(string: post.imageName)) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView() // 載入中
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(1, contentMode: .fill)
+                            .frame(width: 74, height: 74)
+                            .clipped()
+                            .cornerRadius(12)
+                    case .failure:
+                        Image(systemName: "xmark.octagon") // 載入失敗
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            }else{
+                Image(post.imageName)
+                    .resizable()
+                    .aspectRatio(1, contentMode: .fill)
+                    .frame(width: 74, height: 74)
+                    .clipped()
+                    .cornerRadius(12)
+            }
             VStack(alignment: .leading, spacing: 5) {
                 Text(post.title)
                     .font(.headline)

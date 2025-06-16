@@ -99,15 +99,36 @@ struct HomeView: View {
                                 .padding(.top, 16)
 
                             // Dream Image
-                            Image(data.imageName)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(height: 220)
-                                .frame(maxWidth: .infinity)
-                                .clipped()
-                                .cornerRadius(20)
-                                .shadow(radius: 8)
-
+                            if data.imageName.hasPrefix("http"){
+                                AsyncImage(url: URL(string: data.imageName)) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        ProgressView() // 載入中
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(height: 220)
+                                            .frame(maxWidth: .infinity)
+                                            .clipped()
+                                            .cornerRadius(20)
+                                            .shadow(radius: 8)
+                                    case .failure:
+                                        Image(systemName: "xmark.octagon") // 載入失敗
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                            }else{
+                                Image(data.imageName)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 220)
+                                    .frame(maxWidth: .infinity)
+                                    .clipped()
+                                    .cornerRadius(20)
+                                    .shadow(radius: 8)
+                            }
 
                             // Dream Description(Text)
                             Text(data.description)
