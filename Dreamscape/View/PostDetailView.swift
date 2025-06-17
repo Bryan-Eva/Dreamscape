@@ -56,14 +56,34 @@ struct PostDetailView: View {
                         .background(Color.white.opacity(0.18))
                         .cornerRadius(8)
                     
-                    // Dream Image
-                    Image(detail.imageName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .cornerRadius(18)
-                        .shadow(radius: 4)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                    if detail.imageName.hasPrefix("http"){
+                        AsyncImage(url: URL(string: detail.imageName)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView() // 載入中
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .cornerRadius(18)
+                                    .shadow(radius: 4)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                            case .failure:
+                                Image(systemName: "xmark.octagon") // 載入失敗
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    }else{
+                        Image(detail.imageName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .cornerRadius(18)
+                            .shadow(radius: 4)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
 
                     // Dream Text
                     Text(detail.text)
