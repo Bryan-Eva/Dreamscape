@@ -7,6 +7,7 @@
 
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
 
 // MARK: - Data Models
 struct DreamDetail: Identifiable {
@@ -37,6 +38,8 @@ struct PostDetailView: View {
     @State private var showCommentInput: Bool = false
     @State private var newCommentText: String = ""
     @State private var comments: [DreamComment]? = []
+    @State private var showAlert: Bool = false
+    @State private var alertMessage: String = ""
 
     var body: some View {
         ScrollView {
@@ -169,7 +172,24 @@ struct PostDetailView: View {
                                     .scrollContentBackground(.hidden)
                                 Button(action: {
                                     // TODO: call API to post new comment
-                                    
+                                    let comment = Comment(
+                                        id: "",
+                                        articleId: self.articleId,
+                                        text: self.newCommentText,
+                                        time: Timestamp(date: Date()),
+                                        uid: Auth.auth().currentUser!.uid
+                                    )
+                                    FirebaseService.createComment(comment: comment) { success, error in
+                                        if success {
+                                            print("Create Comment Success!")
+                                            showAlert = true
+                                            alertMessage = "Create Comment Success!"
+                                        } else {
+                                            print("Error creating comment: \(error!.localizedDescription)")
+                                            showAlert = true
+                                            alertMessage = "Error creating comment: \(error!.localizedDescription)"
+                                        }
+                                    }
                                     //let newComment = DreamComment(
                                     //    userImage: nil, // Placeholder for user image
                                     //    username: "current_user", // Replace with actual username
@@ -217,6 +237,11 @@ struct PostDetailView: View {
         }
         .background(Color(red: 20/255, green: 23/255, blue: 33/255).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Notification", isPresented: $showAlert) {
+            Button("OK") { }
+        } message: {
+            Text(alertMessage)
+        }
         .onAppear {
             var username = ""
             var get_comments: [DreamComment] = []
@@ -233,9 +258,10 @@ struct PostDetailView: View {
                             }
                         }
 
-                        // Get article comments and call function to match DreanComment model 
+                        // Get article comments and call function to match DreamComment model
                         FirebaseService.fetchComments(for: article.id) { commentSuccess, commentError, fetchedComments in
                             if commentSuccess, let current_comments = fetchedComments {
+                                print(current_comments)
                                 get_comments = self.fetchCommentsDetails(current_comments: current_comments)
                             } else {
                                 print("Error fetching comments: \(String(describing: commentError))")
