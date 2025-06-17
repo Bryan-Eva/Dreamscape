@@ -332,6 +332,58 @@ class FirebaseService {
             completion(true, nil, articles)
         }
     }
+    
+    static func likeArticle(
+        like: Bool,
+        articleId: String,
+        userId: String,
+        completion: @escaping (Bool, Error?) -> Void
+    ) {
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(userId)
+        let articleRef = db.collection("articles").document(articleId)
+
+        db.runTransaction({ (transaction, errorPointer) -> Any? in
+            // 取得使用者與文章
+            let userDoc: DocumentSnapshot
+            let articleDoc: DocumentSnapshot
+            do {
+                try userDoc = transaction.getDocument(userRef)
+                try articleDoc = transaction.getDocument(articleRef)
+            } catch let error as NSError {
+                errorPointer?.pointee = error
+                return nil
+            }
+
+            // 解析使用者按讚資料
+            var likedArticles = userDoc.data()?["likedArticles"] as? [String] ?? []
+            var likedCount = articleDoc.data()?["likedCount"] as? Int ?? 0
+
+            if like {
+                if !likedArticles.contains(articleId) {
+                    likedArticles.append(articleId)
+                    likedCount += 1
+                }
+            } else {
+                if likedArticles.contains(articleId) {
+                    likedArticles.removeAll { $0 == articleId }
+                    likedCount = max(0, likedCount - 1)
+                }
+            }
+
+            // 更新兩個文件
+            transaction.updateData(["likedArticles": likedArticles], forDocument: userRef)
+            transaction.updateData(["likedCount": likedCount], forDocument: articleRef)
+
+            return nil
+        }) { (_, error) in
+            if let error = error {
+                completion(false, error)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
 
     // comment (CR)
     static func createComment(
