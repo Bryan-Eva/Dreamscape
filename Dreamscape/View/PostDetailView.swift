@@ -243,74 +243,71 @@ struct PostDetailView: View {
             Text(alertMessage)
         }
         .onAppear {
-            var username = ""
-            var get_comments: [DreamComment] = []
-            // TODO: call API to fetch post details
+            // Step 1: Fetch article
             FirebaseService.fetchSingleArticle(articleId: self.articleId) { success, error, article in
-                DispatchQueue.main.async {
-                    if success, let article = article {
-                        // Get article username
-                        FirebaseService.fetchSingleUser(uid: article.authorUid) { userSuccess, userError, user in
-                            if userSuccess, let user = user {
-                                username = user.name
-                            } else {
-                                username = "Unknown User"
-                            }
+                guard success, let article = article else {
+                    print("Error fetching article: \(String(describing: error))")
+                    return
+                }
+
+                // Step 2: Fetch article author
+                FirebaseService.fetchSingleUser(uid: article.authorUid) { userSuccess, userError, user in
+                    let username = userSuccess ? (user?.name ?? "Unknown User") : "Unknown User"
+
+                    // Step 3: Fetch comments
+                    FirebaseService.fetchComments(for: article.id) { commentSuccess, commentError, fetchedComments in
+                        guard commentSuccess, let current_comments = fetchedComments else {
+                            print("Error fetching comments: \(String(describing: commentError))")
+                            return
                         }
 
-                        // Get article comments and call function to match DreamComment model
-                        FirebaseService.fetchComments(for: article.id) { commentSuccess, commentError, fetchedComments in
-                            if commentSuccess, let current_comments = fetchedComments {
-                                print(current_comments)
-                                get_comments = self.fetchCommentsDetails(current_comments: current_comments)
-                            } else {
-                                print("Error fetching comments: \(String(describing: commentError))")
+                        // Step 4: Convert comments to DreamComment
+                        fetchCommentsDetails(current_comments: current_comments) { dreamComments in
+                            // Step 5: Update UI with everything
+                            DispatchQueue.main.async {
+                                self.detail = DreamDetail(
+                                    username: username,
+                                    title: article.title,
+                                    imageName: article.image,
+                                    text: article.text,
+                                    emotions: article.emotions,
+                                    topics: article.topics,
+                                    likes: article.likedCount,
+                                    comments: dreamComments
+                                )
+                                self.likesCount = article.likedCount
+
+                                // Step 6: Fetch current user to determine liked state
+                                guard let uid = Auth.auth().currentUser?.uid else {
+                                    print("User not logged in")
+                                    return
+                                }
+                                self.isLiked = false
+                                FirebaseService.fetchSingleUser(uid: uid) { userSuccess, _, user in
+                                    if userSuccess, let user = user {
+                                        self.isLiked = user.likedArticles.contains(article.id)
+                                    }
+                                }
                             }
                         }
-
-                        // Set detail
-                        self.detail = DreamDetail(
-                            username: username,
-                            title: article.title,
-                            imageName: article.image,
-                            text: article.text,
-                            emotions: article.emotions,
-                            topics: article.topics,
-                            likes: article.likedCount,
-                            comments: get_comments
-                        )
-                    } else {
-                        print("Error fetching article: \(String(describing: error))")
                     }
-                    // Initialize likes count
-                    self.likesCount = article?.likedCount ?? 0
-                    // Initialize isLiked state
-                    guard let uid = Auth.auth().currentUser?.uid else {
-                        print("User not logged in")
-                        return
-                    }
-                    self.isLiked = false
-                    FirebaseService.fetchSingleUser(uid: uid){ success,error,user in
-                        if success, let art = article, let usr = user{
-                            self.isLiked = usr.likedArticles.contains(art.id)
-                        }
-                    }
-                    // Default to not liked, you can change this based on user data
                 }
             }
         }
     }
-
-    func fetchCommentsDetails(current_comments: [Comment]) -> [DreamComment] {
-        // Because DreamComment model is different from Comment model, we need to convert it
-        // And DreamComment has usrImage, username, it needs to call API to fetch user info
+    func fetchCommentsDetails(
+        current_comments: [Comment],
+        completion: @escaping ([DreamComment]) -> Void
+    ) {
         var ret_comments: [DreamComment] = []
-        // Loop through each comment and fetch user details
+        let group = DispatchGroup()
+
         for comment in current_comments {
+            group.enter()
             FirebaseService.fetchSingleUser(uid: comment.uid) { success, error, user in
                 if success, let user = user {
                     let dreamComment = DreamComment(
-                        userImage: user.avatar, // Assuming user.image is the image URL or name
+                        userImage: user.avatar,
                         username: user.name,
                         text: comment.text
                     )
@@ -318,10 +315,35 @@ struct PostDetailView: View {
                 } else {
                     print("Error fetching user for comment: \(String(describing: error))")
                 }
+                group.leave()
             }
         }
-        return ret_comments
+
+        group.notify(queue: .main) {
+            completion(ret_comments)
+        }
     }
+//    func fetchCommentsDetails(current_comments: [Comment]) -> [DreamComment] {
+//        // Because DreamComment model is different from Comment model, we need to convert it
+//        // And DreamComment has usrImage, username, it needs to call API to fetch user info
+//        var ret_comments: [DreamComment] = []
+//        // Loop through each comment and fetch user details
+//        for comment in current_comments {
+//            FirebaseService.fetchSingleUser(uid: comment.uid) { success, error, user in
+//                if success, let user = user {
+//                    let dreamComment = DreamComment(
+//                        userImage: user.avatar, // Assuming user.image is the image URL or name
+//                        username: user.name,
+//                        text: comment.text
+//                    )
+//                    ret_comments.append(dreamComment)
+//                } else {
+//                    print("Error fetching user for comment: \(String(describing: error))")
+//                }
+//            }
+//        }
+//        return ret_comments
+//    }
 }
 
 // MARK: - ChipsRowView (Emotions and Topics)
@@ -355,11 +377,30 @@ struct CommentRowView: View {
         HStack(alignment: .top, spacing: 10) {
             // user image (SF Symbol(default) or custom image)
             if let img = comment.userImage, !img.isEmpty {
-                Image(img)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 38, height: 38)
-                    .clipShape(Circle())
+                if img.hasPrefix("http"){
+                    AsyncImage(url: URL(string: img )) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView() // 載入中
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 38, height: 38)
+                                .clipShape(Circle())
+                        case .failure:
+                            Image(systemName: "xmark.octagon") // 載入失敗
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }else{
+                    Image(img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 38, height: 38)
+                        .clipShape(Circle())
+                }
             } else {
                 Image(systemName: "person.circle.fill")
                     .resizable()
