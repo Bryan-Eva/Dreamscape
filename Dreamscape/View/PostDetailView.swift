@@ -117,12 +117,24 @@ struct PostDetailView: View {
                     // Likes Button
                         Button(action: {
                             isLiked.toggle()
-                            if isLiked {
-                                likesCount += 1
-                            } else {
-                                likesCount -= 1
+                            guard let uid = Auth.auth().currentUser?.uid else {
+                                print("User not logged in")
+                                return
                             }
                             // TODO: call API to update likes count
+                            FirebaseService.likeArticle(like: isLiked, articleId: articleId, userId: uid){ success,error in
+                                if success{
+                                    if isLiked {
+                                        likesCount += 1
+                                    } else {
+                                        likesCount -= 1
+                                    }
+                                }else{
+                                    isLiked.toggle()
+                                    print(error?.localizedDescription)
+                                }
+                            }
+                            
                         }){
                             Image(systemName: isLiked ? "heart.fill" : "heart")
                                 .foregroundColor(isLiked ? .pink : .white.opacity(0.5))
@@ -273,7 +285,17 @@ struct PostDetailView: View {
                     // Initialize likes count
                     self.likesCount = article?.likedCount ?? 0
                     // Initialize isLiked state
-                    self.isLiked = false // Default to not liked, you can change this based on user data
+                    guard let uid = Auth.auth().currentUser?.uid else {
+                        print("User not logged in")
+                        return
+                    }
+                    self.isLiked = false
+                    FirebaseService.fetchSingleUser(uid: uid){ success,error,user in
+                        if success, let art = article, let usr = user{
+                            self.isLiked = usr.likedArticles.contains(art.id)
+                        }
+                    }
+                    // Default to not liked, you can change this based on user data
                 }
             }
         }
