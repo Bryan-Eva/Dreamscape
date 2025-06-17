@@ -48,6 +48,13 @@ struct CommunityView: View {
     @State private var topicCounts: [String: Int] = [:]
     @State private var topicSetIndex = 0
     @State private var currentTopicFilter: String? = nil
+    
+    // User to Topics Images (fix)
+        let topicImages: [String] = [
+            "dream_image1", "dream_image2", "dream_image3", "dream_image4", "dream_image5",
+            "dream_image6", "dream_image7", "dream_image8", "dream_image9", "dream_image10",
+            "dream_image11", "dream_image12", "dream_image13", "dream_image14", "dream_image15"
+        ]
 
     // Switch to Explore Tab and with topic filter
     func goToExplore(with topic: String) {
@@ -122,9 +129,9 @@ struct CommunityView: View {
                     }
                     // First: Get and Store all topics from articles
                     let topicsSet = Set(articles.flatMap { $0.topics })
-                    self.allTopics = topicsSet.map { topicName in
+                    self.allTopics = topicsSet.enumerated().map { idx, topicName in
                         // Use a default image for now, can be replaced with actual images later
-                        let imageName = "dream_image" // Placeholder image
+                        let imageName = self.topicImages[idx % self.topicImages.count] // Placeholder image
                         return CommunityTopic(name: topicName, imageName: imageName)
                     }
                     // And count each topic's number of occurrences when iterating through articles
@@ -364,9 +371,9 @@ struct CommunityTopicCardView: View {
 }
 
 // Preview for CommunityView
-struct CommunityView_Previews: PreviewProvider {
-    static var previews: some View {
-        CommunityView()
-            .preferredColorScheme(.dark)
-    }
-}
+// struct CommunityView_Previews: PreviewProvider {
+//    static var previews: some View {
+//        CommunityView()
+//            .preferredColorScheme(.dark)
+//    }
+//}
